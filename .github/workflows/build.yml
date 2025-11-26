@@ -119,6 +119,10 @@ jobs:
       with:
         fileName: "android_keystore.jks"
         encodedString: ${{ secrets.APP_KEYSTORE_BASE64 }}
+        
+    - name: Debug Alias
+      run: |
+        echo "Alias: '${{ secrets.APP_KEYSTORE_ALIAS }}'"
 
     - name: Build APK
       run: |
