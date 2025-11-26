@@ -120,9 +120,12 @@ jobs:
         fileName: "android_keystore.jks"
         encodedString: ${{ secrets.APP_KEYSTORE_BASE64 }}
         
-    - name: Debug Alias
+    - name: Check alias raw
       run: |
-        echo "Alias: '${{ secrets.APP_KEYSTORE_ALIAS }}'"
+        echo "AliasRawStart"
+        echo "${{ secrets.APP_KEYSTORE_ALIAS }}"
+        echo "AliasRawEnd"
+
 
     - name: Build APK
       run: |
