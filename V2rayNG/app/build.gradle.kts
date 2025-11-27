@@ -39,13 +39,14 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            val storeFileProp = project.properties["android.injected.signing.store.file"] as String?
-            val storePasswordProp = project.properties["android.injected.signing.store.password"] as String?
-            val keyAliasProp = project.properties["android.injected.signing.key.alias"] as String?
-            val keyPasswordProp = project.properties["android.injected.signing.key.password"] as String?
+        maybeCreate("release").apply {
+            val storeFileProp = project.findProperty("android.injected.signing.store.file") as String?
+            val storePasswordProp = project.findProperty("android.injected.signing.store.password") as String?
+            val keyAliasProp = project.findProperty("android.injected.signing.key.alias") as String?
+            val keyPasswordProp = project.findProperty("android.injected.signing.key.password") as String?
 
-            if (storeFileProp != null &&
+            if (
+                storeFileProp != null &&
                 storePasswordProp != null &&
                 keyAliasProp != null &&
                 keyPasswordProp != null
