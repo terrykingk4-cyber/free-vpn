@@ -72,7 +72,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -86,6 +85,7 @@ android {
         create("playstore") {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION", "\"Play Store\"")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
