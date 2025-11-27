@@ -39,22 +39,28 @@ android {
     }
 
     signingConfigs {
-        maybeCreate("release").apply {
-            val storeFileProp = project.findProperty("android.injected.signing.store.file") as String?
-            val storePasswordProp = project.findProperty("android.injected.signing.store.password") as String?
-            val keyAliasProp = project.findProperty("android.injected.signing.key.alias") as String?
-            val keyPasswordProp = project.findProperty("android.injected.signing.key.password") as String?
+        create("release").apply {
+            // تغییر نام متغیرها به نام‌های سفارشی
+            val storeFileProp = project.findProperty("MY_APP_STORE_FILE") as String?
+            val storePasswordProp = project.findProperty("MY_APP_STORE_PASSWORD") as String?
+            val keyAliasProp = project.findProperty("MY_APP_KEY_ALIAS") as String?
+            val keyPasswordProp = project.findProperty("MY_APP_KEY_PASSWORD") as String?
+
+            // اضافه کردن لاگ برای دیباگ کردن (فقط مسیر فایل چاپ می‌شود، پسوردها امن می‌مانند)
+            println("Signing Debug: StoreFile: $storeFileProp, Alias: $keyAliasProp")
 
             if (
-                storeFileProp != null &&
-                storePasswordProp != null &&
-                keyAliasProp != null &&
-                keyPasswordProp != null
+                !storeFileProp.isNullOrEmpty() &&
+                !storePasswordProp.isNullOrEmpty() &&
+                !keyAliasProp.isNullOrEmpty() &&
+                !keyPasswordProp.isNullOrEmpty()
             ) {
                 storeFile = file(storeFileProp)
                 storePassword = storePasswordProp
                 keyAlias = keyAliasProp
                 keyPassword = keyPasswordProp
+            } else {
+                println("Signing Debug: One or more signing properties are missing!")
             }
         }
     }
