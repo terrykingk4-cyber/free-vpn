@@ -160,6 +160,16 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         }
     }
 
+    fun importClipboard(context: Context): Boolean {
+        try {
+            val clipboard = Utils.getClipboard(context)
+            return AngConfigManager.importBatchConfig(clipboard, subscriptionId, false) > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.nav_sub_setting -> {
