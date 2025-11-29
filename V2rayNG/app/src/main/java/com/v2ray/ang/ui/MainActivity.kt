@@ -17,7 +17,6 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityMainBinding
-import com.v2ray.ang.dto.EConfigType
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
@@ -42,11 +41,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // *** بخش تنظیمات Toolbar و Drawer حذف شد چون هدر را برداشتیم ***
-        // فقط لیسنر منوی کشویی باقی می‌ماند (اگر با کشیدن انگشت باز شود)
+        // فقط لیسنر منوی کشویی باقی می‌ماند
         binding.navView.setNavigationItemSelectedListener(this)
 
-        // تنظیمات لیست (هرچند مخفی است، اما برای عملکرد آداپتور لازم است)
+        // تنظیمات لیست (هرچند مخفی است)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         val callback = SimpleItemTouchHelperCallback(adapter)
@@ -55,13 +53,19 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         setupViewModel()
 
-        // دریافت کانفیگ از API
+        // دریافت کانفیگ از API و نمایش ورژن
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             val version = pInfo.versionName ?: "1.0.0"
+            
+            // 1. نمایش ورژن در پایین صفحه
+            binding.tvVersion.text = "Ver: $version"
+            
+            // 2. هندشیک با سرور
             mainViewModel.startHandshake(this, version)
         } catch (e: Exception) {
             e.printStackTrace()
+            binding.tvVersion.text = "Ver: Unknown"
         }
 
         // مشاهده پاسخ سرور
@@ -74,7 +78,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
         }
 
-        // دکمه اتصال (FAB)
+        // کلیک روی عکس (دکمه اتصال)
         binding.fab.setOnClickListener {
             if (mainViewModel.isRunning.value == true) {
                 V2RayServiceManager.stopVService(this)
@@ -106,6 +110,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         mainViewModel.isRunning.observe(this) { isRunning ->
             adapter.isRunning = isRunning
             adapter.notifyDataSetChanged()
+            // تغییر عکس بر اساس وضعیت اتصال
             if (isRunning) {
                 binding.fab.setImageResource(R.drawable.ic_disconnect_btn)
             } else {
@@ -120,7 +125,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.setTitle("نسخه جدید موجود است")
         builder.setMessage("لطفا برنامه را آپدیت کنید.")
         builder.setPositiveButton("آپدیت") { _, _ ->
-            val url = "https://google.com" 
+            val url = "https://t.me/gofoftrader85" 
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
             if (isForce) finish()
@@ -134,12 +139,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.show()
     }
 
-    // گزینه‌های منو
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
-        // مخفی کردن تمام گزینه‌های ورود دستی
         menu.findItem(R.id.import_qrcode)?.isVisible = false
         menu.findItem(R.id.import_clipboard)?.isVisible = false
+        // سایر گزینه‌هایی که باید مخفی شوند را اینجا اضافه کن
         return true
     }
 
