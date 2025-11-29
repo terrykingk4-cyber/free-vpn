@@ -31,6 +31,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import java.util.Collections
+import java.util.UUID
+import com.v2ray.ang.service.ApiService
+import com.v2ray.ang.dto.HandshakeRequest
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = MmkvManager.decodeServerList()
@@ -43,7 +46,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
-
+    private val _apiResponseLiveData = MutableLiveData<HandshakeData>()
+    val apiResponseLiveData: LiveData<HandshakeData> = _apiResponseLiveData
+    
     /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
      * `registerReceiver(Context, BroadcastReceiver, IntentFilter, int)`.
@@ -464,6 +469,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     MmkvManager.encodeServerTestDelayMillis(resultPair.first, resultPair.second)
                     updateListAction.value = getPosition(resultPair.first)
                 }
+            }
+        }
+    }
+
+    fun startHandshake(context: Context, currentVersion: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. مدیریت Device ID
+                val sharedPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                var deviceId = sharedPrefs.getString("device_id", null)
+                if (deviceId == null) {
+                    deviceId = UUID.randomUUID().toString()
+                    sharedPrefs.edit().putString("device_id", deviceId).apply()
+                }
+
+                // 2. ساخت ریکوئست
+                val request = HandshakeRequest(deviceId, currentVersion)
+                
+                // 3. کال کردن API
+                val response = ApiService.create().handshake(request)
+
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    val data = response.body()?.data
+                    data?.let {
+                        // ارسال نتیجه به UI (باید لایو دیتا تعریف کنید)
+                        _apiResponseLiveData.postValue(it)
+
+                        // ایمپورت کانفیگ‌ها اگر وجود داشت
+                        if (!it.configs.isNullOrEmpty()) {
+                            // استفاده از کلاس موجود در پروژه برای ایمپورت
+                            AngConfigManager.importBatchConfig(it.configs, "", false) 
+                        }
+                    }
+                } else {
+                // هندل کردن ارور سرور
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // هندل کردن قطعی اینترنت (مثلا نمایش پیام تست کانکشن)
             }
         }
     }
