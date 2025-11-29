@@ -14,7 +14,7 @@ interface ApiService {
 
     companion object {
         // آی‌پی سرور خود را اینجا بگذارید
-        private const val BASE_URL = "https://live.subnitro.pro"
+        private const val BASE_URL = "http://live.subnitro.pro"
 
         fun create(): ApiService {
             return Retrofit.Builder()
