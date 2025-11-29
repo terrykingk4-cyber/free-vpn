@@ -10,35 +10,25 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            android:theme="@style/ThemeOverlay.AppCompat.ActionBar"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-            app:layout_constraintTop_toTopOf="parent"
-            app:titleTextColor="@color/colorAccent"/>
+        android:layout_height="match_parent"
+        android:background="?attr/colorPrimary">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:paddingBottom="80dp"
-            android:clipToPadding="false"
-            app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"/>
 
         <TextView
             android:id="@+id/tvApiMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="24dp"
             android:text=""
             android:textColor="@color/black"
-            android:textSize="16sp"
+            android:textSize="24sp"
             android:textStyle="bold"
             android:gravity="center"
             android:elevation="10dp"
@@ -50,18 +40,17 @@
             android:id="@+id/fab"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="50dp"
             android:src="@drawable/ic_play_24dp"
             android:clickable="true"
             android:focusable="true"
             app:backgroundTint="@color/colorAccent"
             app:tint="@android:color/white"
-            app:fabSize="normal"
+            app:fabCustomSize="120dp"
+            app:maxImageSize="80dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.9" />
+            app:layout_constraintTop_toTopOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

@@ -8,7 +8,6 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -18,6 +17,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.dto.EConfigType
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
@@ -42,19 +42,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 1. تنظیمات تولبار
-        title = getString(R.string.app_name)
-        setSupportActionBar(binding.toolbar)
-
-        // 2. تنظیمات منوی کشویی
-        val toggle = ActionBarDrawerToggle(
-            this, binding.drawerLayout, binding.toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
-        )
-        binding.drawerLayout.addDrawerListener(toggle)
-        toggle.syncState()
+        // *** بخش تنظیمات Toolbar و Drawer حذف شد چون هدر را برداشتیم ***
+        // فقط لیسنر منوی کشویی باقی می‌ماند (اگر با کشیدن انگشت باز شود)
         binding.navView.setNavigationItemSelectedListener(this)
 
-        // 3. تنظیمات لیست
+        // تنظیمات لیست (هرچند مخفی است، اما برای عملکرد آداپتور لازم است)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         val callback = SimpleItemTouchHelperCallback(adapter)
@@ -63,7 +55,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         setupViewModel()
 
-        // 4. لاجیک API (دریافت خودکار کانفیگ)
+        // دریافت کانفیگ از API
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             val version = pInfo.versionName ?: "1.0.0"
@@ -115,11 +107,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             adapter.isRunning = isRunning
             adapter.notifyDataSetChanged()
             if (isRunning) {
-                binding.fab.backgroundTintList =
-                    androidx.core.content.ContextCompat.getColorStateList(this, R.color.color_fab_active)
+                binding.fab.setImageResource(R.drawable.ic_disconnect_btn)
             } else {
-                binding.fab.backgroundTintList =
-                    androidx.core.content.ContextCompat.getColorStateList(this, R.color.color_fab_inactive)
+                binding.fab.setImageResource(R.drawable.ic_connect_btn)
             }
         }
         mainViewModel.startListenBroadcast()
@@ -130,7 +120,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.setTitle("نسخه جدید موجود است")
         builder.setMessage("لطفا برنامه را آپدیت کنید.")
         builder.setPositiveButton("آپدیت") { _, _ ->
-            val url = "https://google.com" // لینک دانلود را اینجا بگذارید
+            val url = "https://google.com" 
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
             if (isForce) finish()
@@ -144,21 +134,19 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.show()
     }
 
-    // حذف گزینه‌های دستی از منو
+    // گزینه‌های منو
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
-        
-        // مخفی کردن گزینه‌های اضافه کردن دستی
+        // مخفی کردن تمام گزینه‌های ورود دستی
         menu.findItem(R.id.import_qrcode)?.isVisible = false
         menu.findItem(R.id.import_clipboard)?.isVisible = false
-        // menu.findItem(R.id.add_config_group)?.isVisible = false 
-        
+        menu.findItem(R.id.import_manual_vmess)?.isVisible = false
+        menu.findItem(R.id.import_manual_vless)?.isVisible = false
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            // فقط گزینه‌های مجاز باقی ماندند
             R.id.ping_all -> {
                 mainViewModel.testAllTcping()
                 true
