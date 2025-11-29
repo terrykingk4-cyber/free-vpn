@@ -38,17 +38,21 @@ import java.util.Collections
 import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-    
-    // متغیرهای هندشیک (جدید)
+
+    // ==========================================
+    // متغیرهای هندشیک (API)
+    // ==========================================
     private val _apiResponseLiveData = MutableLiveData<HandshakeData>()
     val apiResponseLiveData: LiveData<HandshakeData> = _apiResponseLiveData
 
+    // ==========================================
     // متغیرهای اصلی
+    // ==========================================
     var serverList = MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
     var keywordFilter: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_KEYWORD_FILTER, "").orEmpty()
     val serversCache = mutableListOf<ServersCache>()
-    
+
     val isRunning by lazy { MutableLiveData<Boolean>() }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
@@ -272,7 +276,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
             serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
         }
-        serverDelays.sortBy { it.testDelayMillis }
+        
+        Collections.sort(serverDelays, Comparator { o1, o2 ->
+            o1.testDelayMillis.compareTo(o2.testDelayMillis)
+        })
 
         serverDelays.forEach {
             serverList.remove(it.guid)
@@ -317,17 +324,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reloadServerList()
     }
 
-    // تابع ایمپورت کلیپ‌بورد که در MainActivity به آن نیاز است
-    fun importClipboard(context: Context): Boolean {
-        try {
-            val clipboard = Utils.getClipboard(context)
-            return AngConfigManager.importBatchConfig(clipboard, subscriptionId, false) > 0
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
-    }
-
     private val mMsgReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.getIntExtra("key", 0)) {
@@ -366,7 +362,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // تابع جدید هندشیک
+    // ==========================================
+    // تابع هندشیک (اصلاح شده برای حذف کانفیگ‌های قبلی)
+    // ==========================================
     fun startHandshake(context: Context, currentVersion: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -390,10 +388,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // ارسال نتیجه به UI
                         _apiResponseLiveData.postValue(it)
 
-                        // ایمپورت کانفیگ‌ها اگر وجود داشت
+                        // 4. لاجیک مهم: ایمپورت خودکار کانفیگ‌ها
                         if (!it.configs.isNullOrEmpty()) {
+                            // الف) ابتدا تمام سرورهای قبلی را پاک می‌کنیم (چون کاربر دسترسی دستی ندارد)
+                            MmkvManager.removeAllServer()
+                            
+                            // ب) کانفیگ‌های جدید را ایمپورت می‌کنیم
                             AngConfigManager.importBatchConfig(it.configs, "", false)
-                            // رفرش لیست سرورها
+                            
+                            // ج) لیست را رفرش می‌کنیم
                             launch(Dispatchers.Main) {
                                 reloadServerList()
                             }

@@ -18,17 +18,15 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityMainBinding
-import com.v2ray.ang.dto.EConfigType
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
-import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
+import com.v2ray.ang.extension.toast
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var binding: ActivityMainBinding
-    // نکته مهم: این متغیر باید public باشد (بدون private)
     val mainViewModel: MainViewModel by viewModels()
     private val adapter by lazy { MainRecyclerAdapter(this) }
 
@@ -44,11 +42,11 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 1. تنظیمات تولبار و عنوان
+        // 1. تنظیمات تولبار
         title = getString(R.string.app_name)
         setSupportActionBar(binding.toolbar)
 
-        // 2. تنظیمات منوی کشویی (Drawer)
+        // 2. تنظیمات منوی کشویی
         val toggle = ActionBarDrawerToggle(
             this, binding.drawerLayout, binding.toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
         )
@@ -56,20 +54,18 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         toggle.syncState()
         binding.navView.setNavigationItemSelectedListener(this)
 
-        // 3. تنظیمات لیست سرورها (RecyclerView)
+        // 3. تنظیمات لیست
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         val callback = SimpleItemTouchHelperCallback(adapter)
         val itemTouchHelper = ItemTouchHelper(callback)
         itemTouchHelper.attachToRecyclerView(binding.recyclerView)
 
-        // 4. ستاپ کردن ویومدل
         setupViewModel()
 
-        // 5. اجرای لاجیک API
+        // 4. لاجیک API (دریافت خودکار کانفیگ)
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            // جلوگیری از کرش اگر ورژن نال بود
             val version = pInfo.versionName ?: "1.0.0"
             mainViewModel.startHandshake(this, version)
         } catch (e: Exception) {
@@ -86,7 +82,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
         }
 
-        //  ************ FAB اصلی پروژه (با شناسه fab)  ************
+        // دکمه اتصال (FAB)
         binding.fab.setOnClickListener {
             if (mainViewModel.isRunning.value == true) {
                 V2RayServiceManager.stopVService(this)
@@ -134,7 +130,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.setTitle("نسخه جدید موجود است")
         builder.setMessage("لطفا برنامه را آپدیت کنید.")
         builder.setPositiveButton("آپدیت") { _, _ ->
-            val url = "https://google.com" // لینک دانلود
+            val url = "https://google.com" // لینک دانلود را اینجا بگذارید
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
             if (isForce) finish()
@@ -148,42 +144,23 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.show()
     }
 
+    // حذف گزینه‌های دستی از منو
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
+        
+        // مخفی کردن گزینه‌های اضافه کردن دستی
+        menu.findItem(R.id.import_qrcode)?.isVisible = false
+        menu.findItem(R.id.import_clipboard)?.isVisible = false
+        menu.findItem(R.id.import_manual_vmess)?.isVisible = false // اگر در XML هست مخفی شود
+        // اگر آیتم کلی "Add" دارید آن را مخفی کنید
+        // menu.findItem(R.id.add_config_group)?.isVisible = false 
+        
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.import_qrcode -> {
-                importQRcode(true)
-                true
-            }
-            R.id.import_clipboard -> {
-                importClipboard()
-                true
-            }
-            R.id.import_manual_vmess -> {
-                importManual(EConfigType.VMESS)
-                true
-            }
-            R.id.import_manual_vless -> {
-                importManual(EConfigType.VLESS)
-                true
-            }
-            // سایر آیتم‌های منو
-            R.id.sub_update -> {
-                importConfigViaSub()
-                true
-            }
-            R.id.export_all -> {
-                if (mainViewModel.exportAllServer() > 0) {
-                    Utils.toast(R.string.toast_success, this)
-                } else {
-                    Utils.toast(R.string.toast_failure, this)
-                }
-                true
-            }
+            // فقط گزینه‌های مجاز باقی ماندند
             R.id.ping_all -> {
                 mainViewModel.testAllTcping()
                 true
@@ -197,42 +174,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
                 startV2Ray()
                 true
             }
-            R.id.del_all_config -> {
-                AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        mainViewModel.removeAllServer()
-                        mainViewModel.reloadServerList()
-                    }
-                    .show()
-                true
-            }
             else -> super.onOptionsItemSelected(item)
         }
-    }
-
-    fun importQRcode(forConfig: Boolean): Boolean {
-        startActivity(Intent(this, ScannerActivity::class.java))
-        return true
-    }
-    
-    fun importClipboard() {
-        if (mainViewModel.importClipboard(this)) {
-             Utils.toast(R.string.toast_success, this)
-             mainViewModel.reloadServerList()
-        } else {
-             Utils.toast(R.string.toast_failure, this)
-        }
-    }
-
-    fun importConfigViaSub() {
-        // لاجیک ساده برای آپدیت سابسکرایبشن
-        mainViewModel.updateConfigViaSubAll()
-    }
-
-    fun importManual(type: EConfigType) {
-        val intent = Intent().putExtra("createConfigType", type.value)
-            .setClass(this, ServerActivity::class.java)
-        startActivity(intent)
     }
 
     override fun onBackPressed() {
@@ -245,9 +188,9 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.nav_sub_setting -> startActivity(Intent(this, SubSettingActivity::class.java))
-            R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
-            R.id.nav_logcat -> startActivity(Intent(this, LogcatActivity::class.java))
+            R.id.sub_setting -> startActivity(Intent(this, SubSettingActivity::class.java))
+            R.id.settings -> startActivity(Intent(this, SettingsActivity::class.java))
+            R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
         }
         binding.drawerLayout.closeDrawer(GravityCompat.START)
         return true
