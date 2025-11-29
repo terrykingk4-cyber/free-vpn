@@ -151,8 +151,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         // مخفی کردن گزینه‌های اضافه کردن دستی
         menu.findItem(R.id.import_qrcode)?.isVisible = false
         menu.findItem(R.id.import_clipboard)?.isVisible = false
-        menu.findItem(R.id.import_manual_vmess)?.isVisible = false // اگر در XML هست مخفی شود
-        // اگر آیتم کلی "Add" دارید آن را مخفی کنید
         // menu.findItem(R.id.add_config_group)?.isVisible = false 
         
         return true
