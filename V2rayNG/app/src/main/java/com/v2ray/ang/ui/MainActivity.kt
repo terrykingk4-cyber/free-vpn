@@ -140,8 +140,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         // مخفی کردن تمام گزینه‌های ورود دستی
         menu.findItem(R.id.import_qrcode)?.isVisible = false
         menu.findItem(R.id.import_clipboard)?.isVisible = false
-        menu.findItem(R.id.import_manual_vmess)?.isVisible = false
-        menu.findItem(R.id.import_manual_vless)?.isVisible = false
         return true
     }
 
