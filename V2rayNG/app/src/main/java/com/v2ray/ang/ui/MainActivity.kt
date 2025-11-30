@@ -2,6 +2,7 @@ package com.v2ray.ang.ui
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.net.Uri
 import android.net.VpnService
@@ -9,6 +10,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.animation.LinearInterpolator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -38,6 +40,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     // متغیر برای جلوگیری از تداخل کلیک‌ها هنگام اجرای انیمیشن
     private var isFakeConnectingAnimationRunning = false
+    private var spinnerAnimator: ObjectAnimator? = null
 
     private val requestVpnPermission =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -132,8 +135,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             if (bestServer != null) {
                 // ست کردن سرور انتخاب شده در MMKV
                 MmkvManager.setSelectServer(bestServer.guid)
-                // نمایش پیام کوتاه (اختیاری)
-                // toast("Best server selected: ${bestServer.profile.remarks}")
             }
 
             // 6. درخواست مجوز VPN و اتصال نهایی
@@ -165,22 +166,36 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding.loadingSpinner.alpha = 0f
         binding.loadingSpinner.animate().alpha(1f).setDuration(300).start()
 
+        // شروع انیمیشن چرخش (Rotation) روی ImageView
+        spinnerAnimator = ObjectAnimator.ofFloat(binding.loadingSpinner, "rotation", 0f, 360f).apply {
+            duration = 1000 // سرعت چرخش (هر دور 1 ثانیه)
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator() // چرخش یکنواخت
+            start()
+        }
+
         // انیمیشن دکمه (بزرگ شدن و بالا رفتن)
         binding.fab.animate()
             .scaleX(1.2f)
             .scaleY(1.2f)
-            .translationY(-150f) // میزان بالا رفتن
+            .translationY(-150f)
             .setDuration(500)
             .setInterpolator(androidx.interpolator.view.animation.FastOutSlowInInterpolator())
             .start()
     }
 
     private fun animateConnectEnd(targetIsConnected: Boolean) {
-        // مخفی کردن خطوط چرخان
+        // توقف چرخش
+        spinnerAnimator?.cancel()
+        
+        // فید اوت و مخفی کردن اسپینر
         binding.loadingSpinner.animate()
             .alpha(0f)
             .setDuration(300)
-            .withEndAction { binding.loadingSpinner.visibility = View.GONE }
+            .withEndAction { 
+                binding.loadingSpinner.visibility = View.GONE 
+                binding.loadingSpinner.rotation = 0f // ریست کردن زاویه
+            }
             .start()
 
         // بازگشت دکمه به جای اول
@@ -212,11 +227,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index ->
-            if (index >= 0) {
-                adapter.notifyItemChanged(index)
-            } else {
-                adapter.notifyDataSetChanged()
-            }
+            if (index >= 0) adapter.notifyItemChanged(index) else adapter.notifyDataSetChanged()
         }
         mainViewModel.isRunning.observe(this) { isRunning ->
             adapter.isRunning = isRunning
@@ -238,7 +249,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.setTitle("نسخه جدید موجود است")
         builder.setMessage("لطفا برنامه را آپدیت کنید.")
         builder.setPositiveButton("آپدیت") { _, _ ->
-            val url = "https://google.com" 
+            val url = "https://google.com"
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
             if (isForce) finish()

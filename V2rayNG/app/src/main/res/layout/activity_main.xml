@@ -36,14 +36,14 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <ProgressBar
+        <ImageView
             android:id="@+id/loadingSpinner"
-            android:layout_width="250dp"
-            android:layout_height="250dp"
-            android:indeterminate="true"
-            android:indeterminateDrawable="@drawable/animated_spinner"
+            android:layout_width="260dp"
+            android:layout_height="260dp"
+            android:src="@drawable/spinner_ring"
             android:visibility="gone"
-            android:elevation="1dp"
+            android:scaleType="fitCenter"
+            android:elevation="0dp"
             app:layout_constraintBottom_toBottomOf="@+id/fab"
             app:layout_constraintEnd_toEndOf="@+id/fab"
             app:layout_constraintStart_toStartOf="@+id/fab"
