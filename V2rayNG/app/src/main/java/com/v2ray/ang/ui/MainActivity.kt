@@ -1,16 +1,19 @@
 package com.v2ray.ang.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.content.Intent
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
-import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.v2ray.ang.AppConfig
@@ -22,6 +25,10 @@ import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
 import com.v2ray.ang.viewmodel.MainViewModel
 import com.v2ray.ang.extension.toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
 
@@ -29,10 +36,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     val mainViewModel: MainViewModel by viewModels()
     private val adapter by lazy { MainRecyclerAdapter(this) }
 
+    // متغیر برای جلوگیری از تداخل کلیک‌ها هنگام اجرای انیمیشن
+    private var isFakeConnectingAnimationRunning = false
+
     private val requestVpnPermission =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (it.resultCode == RESULT_OK) {
-                startV2Ray()
+                startV2RayWithDelay()
             }
         }
 
@@ -57,18 +67,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             val version = pInfo.versionName ?: "1.0.0"
-            
-            // 1. نمایش ورژن در پایین صفحه
             binding.tvVersion.text = "Ver: $version"
-            
-            // 2. هندشیک با سرور
             mainViewModel.startHandshake(this, version)
         } catch (e: Exception) {
             e.printStackTrace()
             binding.tvVersion.text = "Ver: Unknown"
         }
 
-        // مشاهده پاسخ سرور
         mainViewModel.apiResponseLiveData.observe(this) { data ->
             if (data != null) {
                 binding.tvApiMessage.text = data.text ?: ""
@@ -78,26 +83,132 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
         }
 
-        // کلیک روی عکس (دکمه اتصال)
+        // کلیک روی دکمه اتصال (شروع پروسه هوشمند)
         binding.fab.setOnClickListener {
+            // اگر انیمیشن در حال اجراست، کلیک را نادیده بگیر
+            if (isFakeConnectingAnimationRunning) return@setOnClickListener
+
             if (mainViewModel.isRunning.value == true) {
+                // اگر متصل است -> قطع کن (بدون انیمیشن خاص)
                 V2RayServiceManager.stopVService(this)
-            } else if ((MmkvManager.decodeSettingsString(AppConfig.PREF_MODE) ?: VPN) == VPN) {
-                val intent = VpnService.prepare(this)
-                if (intent == null) {
-                    startV2Ray()
-                } else {
-                    requestVpnPermission.launch(intent)
-                }
             } else {
-                startV2Ray()
+                // اگر قطع است -> شروع پروسه اتصال هوشمند
+                handleSmartConnect()
             }
         }
     }
 
-    private fun startV2Ray() {
-        V2RayServiceManager.startVService(this)
+    /**
+     * لاجیک اتصال هوشمند:
+     * ۱. شروع انیمیشن
+     * ۲. پینگ گرفتن از همه سرورها
+     * ۳. انتخاب بهترین سرور
+     * ۴. اتصال
+     */
+    private fun handleSmartConnect() {
+        lifecycleScope.launch {
+            // 1. شروع انیمیشن ظاهری (بزرگ شدن و چرخش)
+            animateConnectStart()
+
+            // اجرای عملیات سنگین در ترد IO
+            withContext(Dispatchers.IO) {
+                // 2. شروع تست پینگ همه سرورها
+                // از testAllTcping استفاده میکنیم که سریعتر و دقیقتر برای انتخاب سرور است
+                mainViewModel.testAllTcping()
+
+                // 3. صبر کردن برای آمدن نتایج (3 ثانیه)
+                // این مدت زمان با انیمیشن هماهنگ است
+                delay(3000)
+
+                // 4. مرتب‌سازی سرورها بر اساس نتیجه پینگ (بهترین پینگ می‌آید اول لیست)
+                mainViewModel.sortByTestResults()
+                
+                // رفرش لیست در ویومدل تا کش آپدیت شود
+                mainViewModel.reloadServerList()
+            }
+
+            // 5. انتخاب بهترین سرور (اولین آیتم لیست بعد از سورت)
+            val bestServer = mainViewModel.serversCache.firstOrNull()
+            if (bestServer != null) {
+                // ست کردن سرور انتخاب شده در MMKV
+                MmkvManager.setSelectServer(bestServer.guid)
+                // نمایش پیام کوتاه (اختیاری)
+                // toast("Best server selected: ${bestServer.profile.remarks}")
+            }
+
+            // 6. درخواست مجوز VPN و اتصال نهایی
+            if ((MmkvManager.decodeSettingsString(AppConfig.PREF_MODE) ?: VPN) == VPN) {
+                val intent = VpnService.prepare(this@MainActivity)
+                if (intent == null) {
+                    startV2RayWithDelay()
+                } else {
+                    requestVpnPermission.launch(intent)
+                }
+            } else {
+                startV2RayWithDelay()
+            }
+        }
     }
+
+    private fun startV2RayWithDelay() {
+        V2RayServiceManager.startVService(this)
+        // پایان انیمیشن و تغییر آیکون به حالت متصل
+        animateConnectEnd(targetIsConnected = true)
+    }
+
+    // >>>> بخش انیمیشن‌ها <<<<
+
+    private fun animateConnectStart() {
+        isFakeConnectingAnimationRunning = true
+        // نمایش خطوط چرخان
+        binding.loadingSpinner.visibility = View.VISIBLE
+        binding.loadingSpinner.alpha = 0f
+        binding.loadingSpinner.animate().alpha(1f).setDuration(300).start()
+
+        // انیمیشن دکمه (بزرگ شدن و بالا رفتن)
+        binding.fab.animate()
+            .scaleX(1.2f)
+            .scaleY(1.2f)
+            .translationY(-150f) // میزان بالا رفتن
+            .setDuration(500)
+            .setInterpolator(androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+            .start()
+    }
+
+    private fun animateConnectEnd(targetIsConnected: Boolean) {
+        // مخفی کردن خطوط چرخان
+        binding.loadingSpinner.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction { binding.loadingSpinner.visibility = View.GONE }
+            .start()
+
+        // بازگشت دکمه به جای اول
+        binding.fab.animate()
+            .scaleX(1.0f)
+            .scaleY(1.0f)
+            .translationY(0f)
+            .setDuration(500)
+            .setInterpolator(androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    super.onAnimationEnd(animation)
+                    isFakeConnectingAnimationRunning = false
+                    updateFabIcon(targetIsConnected)
+                    binding.fab.animate().setListener(null)
+                }
+            })
+            .start()
+    }
+
+    private fun updateFabIcon(isRunning: Boolean) {
+        if (isRunning) {
+            binding.fab.setImageResource(R.drawable.ic_disconnect_btn)
+        } else {
+            binding.fab.setImageResource(R.drawable.ic_connect_btn)
+        }
+    }
+    // >>>> پایان انیمیشن‌ها <<<<
 
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index ->
@@ -110,11 +221,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         mainViewModel.isRunning.observe(this) { isRunning ->
             adapter.isRunning = isRunning
             adapter.notifyDataSetChanged()
-            // تغییر عکس بر اساس وضعیت اتصال
-            if (isRunning) {
-                binding.fab.setImageResource(R.drawable.ic_disconnect_btn)
-            } else {
-                binding.fab.setImageResource(R.drawable.ic_connect_btn)
+            // فقط اگر انیمیشن در حال اجرا نیست آیکون را عوض کن
+            // (چون در حین انیمیشن نمیخواهیم آیکون بپرد)
+            if (!isFakeConnectingAnimationRunning) {
+                updateFabIcon(isRunning)
+            } else if (!isRunning) {
+                // اگر وسط انیمیشن اتصال قطع شد (ارور)، انیمیشن را تمام کن
+                animateConnectEnd(false)
             }
         }
         mainViewModel.startListenBroadcast()
@@ -125,7 +238,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         builder.setTitle("نسخه جدید موجود است")
         builder.setMessage("لطفا برنامه را آپدیت کنید.")
         builder.setPositiveButton("آپدیت") { _, _ ->
-            val url = "https://t.me/gofoftrader85" 
+            val url = "https://google.com" 
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
             if (isForce) finish()
@@ -143,7 +256,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         menuInflater.inflate(R.menu.menu_main, menu)
         menu.findItem(R.id.import_qrcode)?.isVisible = false
         menu.findItem(R.id.import_clipboard)?.isVisible = false
-        // سایر گزینه‌هایی که باید مخفی شوند را اینجا اضافه کن
         return true
     }
 
@@ -159,7 +271,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
             R.id.service_restart -> {
                 V2RayServiceManager.stopVService(this)
-                startV2Ray()
+                startV2RayWithDelay()
                 true
             }
             else -> super.onOptionsItemSelected(item)
