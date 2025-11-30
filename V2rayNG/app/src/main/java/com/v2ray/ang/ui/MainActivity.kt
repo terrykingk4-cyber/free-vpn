@@ -16,7 +16,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.ItemTouchHelper // اصلاح ۱: اضافه شدن ایمپورت
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.v2ray.ang.AppConfig
@@ -39,9 +39,12 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     val mainViewModel: MainViewModel by viewModels()
     private val adapter by lazy { MainRecyclerAdapter(this) }
 
-    // متغیر برای جلوگیری از تداخل کلیک‌ها هنگام اجرای انیمیشن
     private var isFakeConnectingAnimationRunning = false
-    private var spinnerAnimator: ObjectAnimator? = null
+    
+    // انیماتورهای جداگانه برای هر حلقه
+    private var animSpinner1: ObjectAnimator? = null
+    private var animSpinner2: ObjectAnimator? = null
+    private var animSpinner3: ObjectAnimator? = null
 
     private val requestVpnPermission =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -55,10 +58,8 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // فقط لیسنر منوی کشویی باقی می‌ماند
         binding.navView.setNavigationItemSelectedListener(this)
 
-        // تنظیمات لیست (هرچند مخفی است)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         val callback = SimpleItemTouchHelperCallback(adapter)
@@ -67,7 +68,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
         setupViewModel()
 
-        // دریافت کانفیگ از API و نمایش ورژن
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             val version = pInfo.versionName ?: "1.0.0"
@@ -87,58 +87,35 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             }
         }
 
-        // کلیک روی دکمه اتصال (شروع پروسه هوشمند)
         binding.fab.setOnClickListener {
-            // اگر انیمیشن در حال اجراست، کلیک را نادیده بگیر
             if (isFakeConnectingAnimationRunning) return@setOnClickListener
 
             if (mainViewModel.isRunning.value == true) {
-                // اگر متصل است -> قطع کن (بدون انیمیشن خاص)
                 V2RayServiceManager.stopVService(this)
             } else {
-                // اگر قطع است -> شروع پروسه اتصال هوشمند
                 handleSmartConnect()
             }
         }
     }
 
-    /**
-     * لاجیک اتصال هوشمند:
-     * ۱. شروع انیمیشن
-     * ۲. پینگ گرفتن از همه سرورها
-     * ۳. انتخاب بهترین سرور
-     * ۴. اتصال
-     */
     private fun handleSmartConnect() {
         lifecycleScope.launch {
-            // 1. شروع انیمیشن ظاهری (بزرگ شدن و چرخش)
+            // 1. شروع انیمیشن (بالا رفتن و چرخش)
             animateConnectStart()
 
-            // اجرای عملیات سنگین در ترد IO
             withContext(Dispatchers.IO) {
-                // 2. شروع تست پینگ همه سرورها
-                // از testAllTcping استفاده میکنیم که سریعتر و دقیقتر برای انتخاب سرور است
                 mainViewModel.testAllTcping()
-
-                // 3. صبر کردن برای آمدن نتایج (3 ثانیه)
-                // این مدت زمان با انیمیشن هماهنگ است
                 delay(3000)
-
-                // 4. مرتب‌سازی سرورها بر اساس نتیجه پینگ (بهترین پینگ می‌آید اول لیست)
                 mainViewModel.sortByTestResults()
             }
             
-            // اصلاح ۲: رفرش لیست به ترد اصلی (بیرون از withContext) منتقل شد تا کرش نکند
             mainViewModel.reloadServerList()
 
-            // 5. انتخاب بهترین سرور (اولین آیتم لیست بعد از سورت)
             val bestServer = mainViewModel.serversCache.firstOrNull()
             if (bestServer != null) {
-                // ست کردن سرور انتخاب شده در MMKV
                 MmkvManager.setSelectServer(bestServer.guid)
             }
 
-            // 6. درخواست مجوز VPN و اتصال نهایی
             if ((MmkvManager.decodeSettingsString(AppConfig.PREF_MODE) ?: VPN) == VPN) {
                 val intent = VpnService.prepare(this@MainActivity)
                 if (intent == null) {
@@ -154,50 +131,87 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun startV2RayWithDelay() {
         V2RayServiceManager.startVService(this)
-        // پایان انیمیشن و تغییر آیکون به حالت متصل
         animateConnectEnd(targetIsConnected = true)
     }
 
-    // >>>> بخش انیمیشن‌ها <<<<
+    // >>>> بخش انیمیشن‌های پیشرفته <<<<
 
     private fun animateConnectStart() {
         isFakeConnectingAnimationRunning = true
-        // نمایش خطوط چرخان
-        binding.loadingSpinner.visibility = View.VISIBLE
-        binding.loadingSpinner.alpha = 0f
-        binding.loadingSpinner.animate().alpha(1f).setDuration(300).start()
+        
+        // نمایش حلقه‌ها
+        binding.spinner1.visibility = View.VISIBLE
+        binding.spinner2.visibility = View.VISIBLE
+        binding.spinner3.visibility = View.VISIBLE
+        
+        binding.spinner1.alpha = 0f
+        binding.spinner2.alpha = 0f
+        binding.spinner3.alpha = 0f
+        
+        binding.spinner1.animate().alpha(1f).setDuration(300).start()
+        binding.spinner2.animate().alpha(1f).setDuration(300).start()
+        binding.spinner3.animate().alpha(1f).setDuration(300).start()
 
-        // شروع انیمیشن چرخش (Rotation) روی ImageView
-        spinnerAnimator = ObjectAnimator.ofFloat(binding.loadingSpinner, "rotation", 0f, 360f).apply {
-            duration = 1000 // سرعت چرخش (هر دور 1 ثانیه)
+        // تنظیم انیمیشن چرخش متفاوت برای هر حلقه (غیر همزمان)
+        
+        // حلقه ۱: سرعت معمولی
+        animSpinner1 = ObjectAnimator.ofFloat(binding.spinner1, "rotation", 0f, 360f).apply {
+            duration = 1200
             repeatCount = ObjectAnimator.INFINITE
-            interpolator = LinearInterpolator() // چرخش یکنواخت
+            interpolator = LinearInterpolator()
             start()
         }
 
-        // انیمیشن دکمه (بزرگ شدن و بالا رفتن)
-        binding.fab.animate()
-            .scaleX(1.2f)
-            .scaleY(1.2f)
-            .translationY(-150f)
-            .setDuration(500)
-            .setInterpolator(androidx.interpolator.view.animation.FastOutSlowInInterpolator())
-            .start()
+        // حلقه ۲: سرعت کمتر و جهت معکوس (از 360 به 0)
+        animSpinner2 = ObjectAnimator.ofFloat(binding.spinner2, "rotation", 360f, 0f).apply {
+            duration = 1800
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            start()
+        }
+
+        // حلقه ۳: سرعت خیلی زیاد
+        animSpinner3 = ObjectAnimator.ofFloat(binding.spinner3, "rotation", 0f, 360f).apply {
+            duration = 900
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            start()
+        }
+
+        // حرکت به بالا (شناور شدن) - همه با هم
+        val translationY = -150f
+        val durationMove = 500L
+        val interpolatorMove = androidx.interpolator.view.animation.FastOutSlowInInterpolator()
+
+        binding.fab.animate().translationY(translationY).scaleX(1.2f).scaleY(1.2f).setDuration(durationMove).setInterpolator(interpolatorMove).start()
+        
+        // حلقه‌ها هم باید با دکمه بالا بیایند
+        binding.spinner1.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
+        binding.spinner2.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
+        binding.spinner3.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
     }
 
     private fun animateConnectEnd(targetIsConnected: Boolean) {
-        // توقف چرخش
-        spinnerAnimator?.cancel()
+        // توقف چرخش‌ها
+        animSpinner1?.cancel()
+        animSpinner2?.cancel()
+        animSpinner3?.cancel()
         
-        // فید اوت و مخفی کردن اسپینر
-        binding.loadingSpinner.animate()
-            .alpha(0f)
-            .setDuration(300)
-            .withEndAction { 
-                binding.loadingSpinner.visibility = View.GONE 
-                binding.loadingSpinner.rotation = 0f // ریست کردن زاویه
-            }
-            .start()
+        // فید اوت و مخفی کردن حلقه‌ها
+        val hideAction = Runnable { 
+            binding.spinner1.visibility = View.GONE
+            binding.spinner2.visibility = View.GONE
+            binding.spinner3.visibility = View.GONE
+        }
+        
+        binding.spinner1.animate().alpha(0f).setDuration(300).start()
+        binding.spinner2.animate().alpha(0f).setDuration(300).start()
+        binding.spinner3.animate().alpha(0f).setDuration(300).withEndAction(hideAction).start()
+
+        // بازگشت حلقه‌ها به پایین (برای اینکه اگر دوباره انیمیشن اجرا شد از جای درست شروع شود)
+        binding.spinner1.animate().translationY(0f).setDuration(500).start()
+        binding.spinner2.animate().translationY(0f).setDuration(500).start()
+        binding.spinner3.animate().translationY(0f).setDuration(500).start()
 
         // بازگشت دکمه به جای اول
         binding.fab.animate()
@@ -233,12 +247,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         mainViewModel.isRunning.observe(this) { isRunning ->
             adapter.isRunning = isRunning
             adapter.notifyDataSetChanged()
-            // فقط اگر انیمیشن در حال اجرا نیست آیکون را عوض کن
-            // (چون در حین انیمیشن نمیخواهیم آیکون بپرد)
+            
             if (!isFakeConnectingAnimationRunning) {
                 updateFabIcon(isRunning)
             } else if (!isRunning) {
-                // اگر وسط انیمیشن اتصال قطع شد (ارور)، انیمیشن را تمام کن
                 animateConnectEnd(false)
             }
         }

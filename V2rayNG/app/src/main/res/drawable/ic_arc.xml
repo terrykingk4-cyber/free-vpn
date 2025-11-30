@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <path
+        android:name="arc"
+        android:pathData="M 10 100 A 90 90 0 0 1 190 100"
+        android:strokeColor="@color/brand_green_light"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#10b57c" />
+</vector>
