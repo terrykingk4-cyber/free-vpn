@@ -4,8 +4,11 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.content.Intent
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -41,7 +44,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private var isFakeConnectingAnimationRunning = false
     
-    // انیماتورهای جداگانه برای هر حلقه
     private var animSpinner1: ObjectAnimator? = null
     private var animSpinner2: ObjectAnimator? = null
     private var animSpinner3: ObjectAnimator? = null
@@ -100,7 +102,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
     private fun handleSmartConnect() {
         lifecycleScope.launch {
-            // 1. شروع انیمیشن (بالا رفتن و چرخش)
+            // شروع انیمیشن و بلر کردن پس‌زمینه
             animateConnectStart()
 
             withContext(Dispatchers.IO) {
@@ -139,7 +141,22 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
     private fun animateConnectStart() {
         isFakeConnectingAnimationRunning = true
         
-        // نمایش حلقه‌ها
+        // 1. تغییر عکس به حالت "در حال اتصال" (عکس سوم)
+        // مطمئن شوید عکس ic_connecting.png را در drawable قرار داده‌اید
+        binding.fab.setImageResource(R.drawable.ic_connecting)
+
+        // 2. اعمال افکت بلر (Blur) روی کانتینر پشت دکمه
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // برای اندروید 12 به بالا: بلر واقعی
+            val blurEffect = RenderEffect.createBlurEffect(15f, 15f, Shader.TileMode.MIRROR)
+            binding.blurContainer.setRenderEffect(blurEffect)
+        } else {
+            // برای اندرویدهای قدیمی: تیره کردن (Dim)
+            binding.dimOverlay.visibility = View.VISIBLE
+            binding.dimOverlay.animate().alpha(0.6f).setDuration(300).start()
+        }
+
+        // 3. نمایش و چرخش حلقه‌ها
         binding.spinner1.visibility = View.VISIBLE
         binding.spinner2.visibility = View.VISIBLE
         binding.spinner3.visibility = View.VISIBLE
@@ -152,8 +169,6 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding.spinner2.animate().alpha(1f).setDuration(300).start()
         binding.spinner3.animate().alpha(1f).setDuration(300).start()
 
-        // تنظیم انیمیشن چرخش متفاوت برای هر حلقه (غیر همزمان)
-        
         // حلقه ۱: سرعت معمولی
         animSpinner1 = ObjectAnimator.ofFloat(binding.spinner1, "rotation", 0f, 360f).apply {
             duration = 1200
@@ -162,7 +177,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             start()
         }
 
-        // حلقه ۲: سرعت کمتر و جهت معکوس (از 360 به 0)
+        // حلقه ۲: سرعت کمتر و جهت معکوس
         animSpinner2 = ObjectAnimator.ofFloat(binding.spinner2, "rotation", 360f, 0f).apply {
             duration = 1800
             repeatCount = ObjectAnimator.INFINITE
@@ -178,14 +193,13 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
             start()
         }
 
-        // حرکت به بالا (شناور شدن) - همه با هم
-        val translationY = -150f
+        // حرکت به بالا (شناور شدن)
+        val translationY = -250f // مقدار بالاتر رفتن
         val durationMove = 500L
         val interpolatorMove = androidx.interpolator.view.animation.FastOutSlowInInterpolator()
 
         binding.fab.animate().translationY(translationY).scaleX(1.2f).scaleY(1.2f).setDuration(durationMove).setInterpolator(interpolatorMove).start()
         
-        // حلقه‌ها هم باید با دکمه بالا بیایند
         binding.spinner1.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
         binding.spinner2.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
         binding.spinner3.animate().translationY(translationY).setDuration(durationMove).setInterpolator(interpolatorMove).start()
@@ -197,7 +211,16 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         animSpinner2?.cancel()
         animSpinner3?.cancel()
         
-        // فید اوت و مخفی کردن حلقه‌ها
+        // حذف افکت بلر
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            binding.blurContainer.setRenderEffect(null)
+        } else {
+            binding.dimOverlay.animate().alpha(0f).setDuration(300).withEndAction {
+                binding.dimOverlay.visibility = View.GONE
+            }.start()
+        }
+
+        // مخفی کردن حلقه‌ها
         val hideAction = Runnable { 
             binding.spinner1.visibility = View.GONE
             binding.spinner2.visibility = View.GONE
@@ -208,7 +231,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         binding.spinner2.animate().alpha(0f).setDuration(300).start()
         binding.spinner3.animate().alpha(0f).setDuration(300).withEndAction(hideAction).start()
 
-        // بازگشت حلقه‌ها به پایین (برای اینکه اگر دوباره انیمیشن اجرا شد از جای درست شروع شود)
+        // بازگشت حلقه‌ها
         binding.spinner1.animate().translationY(0f).setDuration(500).start()
         binding.spinner2.animate().translationY(0f).setDuration(500).start()
         binding.spinner3.animate().translationY(0f).setDuration(500).start()
