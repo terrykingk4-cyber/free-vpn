@@ -48,13 +48,28 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
+        <TextView
+            android:id="@+id/tvApiMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="40dp"
+            android:text=""
+            android:textColor="@color/black"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:elevation="5dp"
+            app:layout_constraintBottom_toTopOf="@+id/fab"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
         <ImageView
             android:id="@+id/spinner3"
             android:layout_width="310dp"
             android:layout_height="310dp"
             android:src="@drawable/ic_arc"
             android:visibility="gone"
-            android:elevation="0dp"
+            android:elevation="10dp"
             android:rotation="240"
             app:layout_constraintBottom_toBottomOf="@+id/fab"
             app:layout_constraintEnd_toEndOf="@+id/fab"
@@ -67,7 +82,7 @@
             android:layout_height="270dp"
             android:src="@drawable/ic_arc"
             android:visibility="gone"
-            android:elevation="0dp"
+            android:elevation="10dp"
             android:rotation="120"
             app:layout_constraintBottom_toBottomOf="@+id/fab"
             app:layout_constraintEnd_toEndOf="@+id/fab"
@@ -80,7 +95,7 @@
             android:layout_height="230dp"
             android:src="@drawable/ic_arc"
             android:visibility="gone"
-            android:elevation="0dp"
+            android:elevation="10dp"
             app:layout_constraintBottom_toBottomOf="@+id/fab"
             app:layout_constraintEnd_toEndOf="@+id/fab"
             app:layout_constraintStart_toStartOf="@+id/fab"
@@ -95,26 +110,11 @@
             android:scaleType="fitCenter"
             android:clickable="true"
             android:focusable="true"
-            android:elevation="10dp"
+            android:elevation="20dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/tvApiMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="40dp"
-            android:text=""
-            android:textColor="@color/black"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:elevation="15dp"
-            app:layout_constraintBottom_toTopOf="@+id/fab"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
