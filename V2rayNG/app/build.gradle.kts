@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.free.vvpnn2025"
+        applicationId = "com.lagacy.lagacyvpn"
         minSdk = 21
         targetSdk = 35
         versionCode = 1
