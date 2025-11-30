@@ -26,13 +26,8 @@ import java.net.URI
 
 object AngConfigManager {
 
-
     /**
      * Shares the configuration to the clipboard.
-     *
-     * @param context The context.
-     * @param guid The GUID of the configuration.
-     * @return The result code.
      */
     fun share2Clipboard(context: Context, guid: String): Int {
         try {
@@ -40,9 +35,7 @@ object AngConfigManager {
             if (TextUtils.isEmpty(conf)) {
                 return -1
             }
-
             Utils.setClipboard(context, conf)
-
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "Failed to share config to clipboard", e)
             return -1
@@ -52,10 +45,6 @@ object AngConfigManager {
 
     /**
      * Shares non-custom configurations to the clipboard.
-     *
-     * @param context The context.
-     * @param serverList The list of server GUIDs.
-     * @return The number of configurations shared.
      */
     fun shareNonCustomConfigsToClipboard(context: Context, serverList: List<String>): Int {
         try {
@@ -80,9 +69,6 @@ object AngConfigManager {
 
     /**
      * Shares the configuration as a QR code.
-     *
-     * @param guid The GUID of the configuration.
-     * @return The QR code bitmap.
      */
     fun share2QRCode(guid: String): Bitmap? {
         try {
@@ -91,7 +77,6 @@ object AngConfigManager {
                 return null
             }
             return QRCodeDecoder.createQRCode(conf)
-
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "Failed to share config as QR code", e)
             return null
@@ -100,10 +85,6 @@ object AngConfigManager {
 
     /**
      * Shares the full content of the configuration to the clipboard.
-     *
-     * @param context The context.
-     * @param guid The GUID of the configuration.
-     * @return The result code.
      */
     fun shareFullContent2Clipboard(context: Context, guid: String?): Int {
         try {
@@ -130,9 +111,6 @@ object AngConfigManager {
 
     /**
      * Shares the configuration.
-     *
-     * @param guid The GUID of the configuration.
-     * @return The configuration string.
      */
     private fun shareConfig(guid: String): String {
         try {
@@ -157,24 +135,52 @@ object AngConfigManager {
 
     /**
      * Imports a batch of configurations.
-     *
-     * @param server The server string.
-     * @param subid The subscription ID.
-     * @param append Whether to append the configurations.
-     * @return A pair containing the number of configurations and subscriptions imported.
+     * Modified to handle single URI strings without crashing on Base64 decode.
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
-        if (count <= 0) {
-            count = parseBatchConfig(server, subid, append)
-        }
-        if (count <= 0) {
-            count = parseCustomConfigServer(server, subid)
+        val configString = server ?: return 0 to 0
+        var count = 0
+
+        // 1. اولویت با لینک تک: اگر ورودی شبیه لینک است (:// دارد)، مستقیم پارس کن
+        // این کار باعث می‌شود از decode کردن بیهوده و کرش جلوگیری شود.
+        if (configString.contains("://")) {
+            count = parseBatchConfig(configString, subid, append)
         }
 
-        var countSub = parseBatchSubscription(server)
+        // 2. اگر لینک نبود یا پارس نشد، فرض می‌کنیم سابسکرایبشن (Base64) است
+        if (count <= 0) {
+            try {
+                // تلاش برای دیکد کردن. اگر فرمت اشتباه باشد، اینجا کرش نمی‌کند و به catch می‌رود
+                val decoded = Utils.decode(configString)
+                if (!TextUtils.isEmpty(decoded)) {
+                    count = parseBatchConfig(decoded, subid, append)
+                }
+            } catch (e: Exception) {
+                Log.d(AppConfig.TAG, "importBatchConfig: Base64 decode failed, trying raw string. Error: ${e.message}")
+            }
+        }
+
+        // 3. تلاش نهایی با رشته خام (برای حالت‌هایی که دیکد نشده اما کانفیگ معتبر است)
+        if (count <= 0) {
+            count = parseBatchConfig(configString, subid, append)
+        }
+        
+        // تلاش برای پارس کردن به عنوان کانفیگ کاستوم (JSON)
+        if (count <= 0) {
+            count = parseCustomConfigServer(configString, subid)
+        }
+
+        // پارس کردن سابسکرایبشن‌ها
+        var countSub = parseBatchSubscription(configString)
         if (countSub <= 0) {
-            countSub = parseBatchSubscription(Utils.decode(server))
+            try {
+                val decoded = Utils.decode(configString)
+                if (!TextUtils.isEmpty(decoded)) {
+                    countSub = parseBatchSubscription(decoded)
+                }
+            } catch (e: Exception) {
+                // Ignored
+            }
         }
         if (countSub > 0) {
             updateConfigViaSubAll()
@@ -183,12 +189,6 @@ object AngConfigManager {
         return count to countSub
     }
 
-    /**
-     * Parses a batch of subscriptions.
-     *
-     * @param servers The servers string.
-     * @return The number of subscriptions parsed.
-     */
     private fun parseBatchSubscription(servers: String?): Int {
         try {
             if (servers == null) {
@@ -210,14 +210,6 @@ object AngConfigManager {
         return 0
     }
 
-    /**
-     * Parses a batch of configurations.
-     *
-     * @param servers The servers string.
-     * @param subid The subscription ID.
-     * @param append Whether to append the configurations.
-     * @return The number of configurations parsed.
-     */
     private fun parseBatchConfig(servers: String?, subid: String, append: Boolean): Int {
         try {
             if (servers == null) {
@@ -258,13 +250,6 @@ object AngConfigManager {
         return 0
     }
 
-    /**
-     * Parses a custom configuration server.
-     *
-     * @param server The server string.
-     * @param subid The subscription ID.
-     * @return The number of configurations parsed.
-     */
     private fun parseCustomConfigServer(server: String?, subid: String): Int {
         if (server == null) {
             return 0
@@ -318,15 +303,6 @@ object AngConfigManager {
         }
     }
 
-    /**
-     * Parses the configuration from a QR code or string.
-     *
-     * @param str The configuration string.
-     * @param subid The subscription ID.
-     * @param subItem The subscription item.
-     * @param removedSelectedServer The removed selected server.
-     * @return The result code.
-     */
     private fun parseConfig(
         str: String?,
         subid: String,
@@ -380,11 +356,6 @@ object AngConfigManager {
         return 0
     }
 
-    /**
-     * Updates the configuration via all subscriptions.
-     *
-     * @return The number of configurations updated.
-     */
     fun updateConfigViaSubAll(): Int {
         var count = 0
         try {
@@ -398,12 +369,6 @@ object AngConfigManager {
         return count
     }
 
-    /**
-     * Updates the configuration via a subscription.
-     *
-     * @param it The subscription item.
-     * @return The number of configurations updated.
-     */
     fun updateConfigViaSub(it: Pair<String, SubscriptionItem>): Int {
         try {
             if (TextUtils.isEmpty(it.first)
@@ -452,14 +417,6 @@ object AngConfigManager {
         }
     }
 
-    /**
-     * Parses the configuration via a subscription.
-     *
-     * @param server The server string.
-     * @param subid The subscription ID.
-     * @param append Whether to append the configurations.
-     * @return The number of configurations parsed.
-     */
     private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
         var count = parseBatchConfig(Utils.decode(server), subid, append)
         if (count <= 0) {
@@ -471,12 +428,6 @@ object AngConfigManager {
         return count
     }
 
-    /**
-     * Imports a URL as a subscription.
-     *
-     * @param url The URL.
-     * @return The number of subscriptions imported.
-     */
     private fun importUrlAsSubscription(url: String): Int {
         val subscriptions = MmkvManager.decodeSubscriptions()
         subscriptions.forEach {
@@ -492,17 +443,6 @@ object AngConfigManager {
         return 1
     }
 
-    /**
-     * Creates an intelligent selection configuration based on multiple server configurations.
-     *
-     * @param context The application context used for configuration generation.
-     * @param guidList The list of server GUIDs to be included in the intelligent selection.
-     *                 Each GUID represents a server configuration that will be combined.
-     * @param subid The subscription ID to associate with the generated configuration.
-     *              This helps organize the configuration under a specific subscription.
-     * @return The GUID key of the newly created intelligent selection configuration,
-     *         or null if the operation fails (e.g., empty guidList or configuration parsing error).
-     */
     fun createIntelligentSelection(
         context: Context,
         guidList: List<String>,
