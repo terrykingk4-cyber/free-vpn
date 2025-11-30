@@ -142,7 +142,7 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
         isFakeConnectingAnimationRunning = true
         
         // 1. تغییر عکس به حالت "در حال اتصال" (عکس سوم)
-        // مطمئن شوید عکس ic_connecting.png را در drawable قرار داده‌اید
+        
         binding.fab.setImageResource(R.drawable.ic_connecting)
 
         // 2. اعمال افکت بلر (Blur) روی کانتینر پشت دکمه
