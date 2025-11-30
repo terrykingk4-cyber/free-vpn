@@ -16,6 +16,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ItemTouchHelper // اصلاح ۱: اضافه شدن ایمپورت
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.v2ray.ang.AppConfig
@@ -31,7 +32,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.recyclerview.widget.ItemTouchHelper
 
 class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedListener {
 
@@ -126,10 +126,10 @@ class MainActivity : BaseActivity(), NavigationView.OnNavigationItemSelectedList
 
                 // 4. مرتب‌سازی سرورها بر اساس نتیجه پینگ (بهترین پینگ می‌آید اول لیست)
                 mainViewModel.sortByTestResults()
-                
-                // رفرش لیست در ویومدل تا کش آپدیت شود
-                mainViewModel.reloadServerList()
             }
+            
+            // اصلاح ۲: رفرش لیست به ترد اصلی (بیرون از withContext) منتقل شد تا کرش نکند
+            mainViewModel.reloadServerList()
 
             // 5. انتخاب بهترین سرور (اولین آیتم لیست بعد از سورت)
             val bestServer = mainViewModel.serversCache.firstOrNull()
