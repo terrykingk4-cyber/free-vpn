@@ -22,19 +22,18 @@ interface ApiService {
         private const val PRIMARY_BASE_URL = "https://live.n-cpanel.xyz"
         
         // دامین دوم (بک‌آپ) - آدرس دامین دوم خود را اینجا وارد کنید
-        private const val SECONDARY_BASE_URL = "https://live.n-cpanel.xyz" 
+        private const val SECONDARY_BASE_URL = "https://backup.example.com" 
 
         fun create(): ApiService {
-            // تنظیم کلاینت با تایم‌اوت 5 ثانیه و اینترسپتور هوشمند
             val client = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS) // تایم‌اوت اتصال
-                .readTimeout(5, TimeUnit.SECONDS)    // تایم‌اوت خواندن
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)
-                .addInterceptor(FailoverInterceptor()) // افزودن منطق تغییر دامین
+                .addInterceptor(FailoverInterceptor())
                 .build()
 
             return Retrofit.Builder()
-                .baseUrl(PRIMARY_BASE_URL) // شروع با دامین اصلی
+                .baseUrl(PRIMARY_BASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
@@ -42,34 +41,35 @@ interface ApiService {
         }
     }
 
-    // اینترسپتور برای مدیریت خطا و تغییر دامین
     class FailoverInterceptor : Interceptor {
         @Throws(IOException::class)
         override fun intercept(chain: Interceptor.Chain): Response {
             var request = chain.request()
             try {
-                // تلاش اول: ارسال ریکوئست به دامین اصلی
                 return chain.proceed(request)
             } catch (e: IOException) {
-                // اگر ارور شبکه یا تایم‌اوت (بعد از 5 ثانیه) رخ داد:
-                
-                // 1. استخراج اطلاعات دامین دوم
-                val secondaryUri = URI(SECONDARY_BASE_URL)
-                
-                // 2. ساخت URL جدید با جایگزینی هاست و اسکیم (http/https)
-                val newUrl = request.url.newBuilder()
-                    .scheme(secondaryUri.scheme)
-                    .host(secondaryUri.host)
-                    .port(if (secondaryUri.port != -1) secondaryUri.port else request.url.port)
-                    .build()
+                try {
+                    val secondaryUri = URI(SECONDARY_BASE_URL)
+                    
+                    // استفاده از url() به جای url برای جلوگیری از خطای دسترسی به فیلد
+                    val currentUrl = request.url() 
+                    val newUrlBuilder = currentUrl.newBuilder()
+                        .scheme(secondaryUri.scheme)
+                        .host(secondaryUri.host)
+                    
+                    // استفاده از port() به جای port
+                    val newPort = if (secondaryUri.port != -1) secondaryUri.port else currentUrl.port()
+                    newUrlBuilder.port(newPort)
 
-                // 3. ساخت ریکوئست جدید با URL جدید
-                val newRequest = request.newBuilder()
-                    .url(newUrl)
-                    .build()
+                    val newRequest = request.newBuilder()
+                        .url(newUrlBuilder.build())
+                        .build()
 
-                // 4. تلاش دوم: ارسال ریکوئست به دامین دوم
-                return chain.proceed(newRequest)
+                    return chain.proceed(newRequest)
+                } catch (e2: Exception) {
+                    // اگر دامین دوم هم فیل شد، ارور اصلی را برگردان
+                    throw e
+                }
             }
         }
     }
